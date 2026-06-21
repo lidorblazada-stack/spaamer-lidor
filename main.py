@@ -1745,77 +1745,47 @@ async def add_credits(interaction: discord.Interaction, target_type: str, amount
     
     await interaction.response.defer(ephemeral=True)
 
-    # --- אפשרות 1: הוספה לכולם ---
+# --- אפשרות 1: הוספה לכולם ---
     if target_type == "all":
         try:
             users_ref = db.reference("users")
             all_users = users_ref.get()
-            
             if not all_users or not isinstance(all_users, dict):
-                return await interaction.followup.send("⚠️ בסיס הנתונים ריק, אין משתמשים לעדכן.", ephemeral=True)
+                return await interaction.followup.send("⚠️ בסיס הנתונים ריק.", ephemeral=True)
             
             for uid, data in all_users.items():
                 cur = data.get("credits", "0")
-                if amount.lower() == "lifetime":
+                if amount.lower() == "lifetime" or cur == "lifetime":
                     new_val = "lifetime"
-                elif cur != "lifetime":
-                    new_val = str(int(cur) + int(amount))
                 else:
-                    new_val = "lifetime"
-                
+                    new_val = str(int(cur) + int(amount))
                 users_ref.child(uid).update({"credits": new_val})
             await interaction.followup.send("✅ עודכנו כל המשתמשים בבסיס הנתונים!", ephemeral=True)
         except Exception as e:
             await interaction.followup.send(f"❌ שגיאה בעדכון גורף: {e}", ephemeral=True)
 
-   elif target_type == "single":
+    # --- אפשרות 2: משתמש בודד ---
+    elif target_type == "single":
         if not user:
             return await interaction.followup.send("❌ שכחת לבחור משתמש!", ephemeral=True)
-            
-        ref = db.reference(f"users/{user.id}")
         
-        # 1. ניסיון משיכת נתונים (עם הגנת 404)
+        ref = db.reference(f"users/{user.id}")
         try:
             snap = ref.get()
             cur = str(snap.get("credits", "0")) if (snap and isinstance(snap, dict)) else "0"
-        except Exception:
+        except:
             cur = "0"
 
-        # 2. חישוב הערך החדש
         if cur == "lifetime" or amount.lower() == "lifetime":
             new_total = "lifetime"
         else:
             try:
-                add_int = int(amount)
-                if add_int < 0:
-                    return await interaction.followup.send("❌ לא ניתן להוסיף כמות שלילית", ephemeral=True)
-                new_total = str(int(cur) + add_int)
+                new_total = str(int(cur) + int(amount))
             except ValueError:
                 return await interaction.followup.send("❌ נא להזין מספר תקין או 'lifetime'", ephemeral=True)
         
-        # 3. עדכון ב-Firebase (שימוש ב-set ליצירה או עדכון)
-        ref.set({
-            "credits": new_total,
-            "last_claim": 0 
-        })
-        
-        # 4. הודעה למנהל
+        ref.set({"credits": new_total, "last_claim": 0})
         await interaction.followup.send(f"✅ עודכן בהצלחה! יתרה חדשה: {new_total}", ephemeral=True)
-            
-        updated_count = 0
-        for u_id, u_data in all_users.items():
-            # מדלגים על משתמשי lifetime קיימים כדי לא להרוס להם את הסטטוס
-            if u_data.get("credits") == "lifetime":
-                continue
-                
-            try:
-                curr_int = int(u_data.get("credits", 0))
-            except (ValueError, TypeError):
-                curr_int = 0
-                
-            new_credits = str(curr_int + add_int)
-            db.reference(f"users/{u_id}").update({"credits": new_credits})
-            updated_count += 1
             
         await send_detailed_log("💰 הוספת קרדיטים גלובלית", interaction.user, [
             {"name": "כמות שהתווספה לכולם:", "value": str(add_int)},
