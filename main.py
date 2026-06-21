@@ -1550,31 +1550,29 @@ async def on_ready():
     print(f"💥 Storm Bomber Ready! Logged in as {bot.user}")
 
 @bot.event
-@bot.event
 async def on_interaction(interaction: discord.Interaction):
     if interaction.type != discord.InteractionType.component:
         return
-        
+
     custom_id = interaction.data.get("custom_id", "")
-    
- if custom_id == "my_credits":
+    user_id = str(interaction.user.id)
+
+    if custom_id == "my_credits":
+        try:
             try:
-                try:
-                    snap = db.reference(f"users/{user_id}").get()
-                    cur_credits = snap.get("credits", "0") if (snap and isinstance(snap, dict)) else "0"
-                except Exception as fb_err:
-                    # אם הטבלה לא קיימת (404) או כל שגיאת תקשורת
-                    cur_credits = "0"
-                    
-                await interaction.response.send_message(f"💰 יתרתך הנוכחית: **{cur_credits}** קרדיטים", ephemeral=True)
-            except Exception as e:
-                await interaction.response.send_message(f"❌ שגיאה בקריאת נתונים: {e}", ephemeral=True)
-            return
+                snap = db.reference(f"users/{user_id}").get()
+                cur_credits = snap.get("credits", "0") if (snap and isinstance(snap, dict)) else "0"
+            except Exception:
+                cur_credits = "0"
+                
+            await interaction.response.send_message(f"💰 יתרתך הנוכחית: **{cur_credits}** קרדיטים", ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ שגיאה בקריאת נתונים: {e}", ephemeral=True)
+        return
 
-        elif custom_id == "spam_phone":
-            await interaction.response.send_modal(SpamModal())
-            return
-
+    elif custom_id == "spam_phone":
+        await interaction.response.send_modal(SpamModal())
+        return
         # 🎁 הבלוק החדש שמטפל בפרס היומי
         elif custom_id == "daily_claim_btn":
             try:
