@@ -1557,21 +1557,39 @@ async def on_interaction(interaction: discord.Interaction):
         
     custom_id = interaction.data.get("custom_id", "")
     
-    if custom_id == "my_credits":
-        snap = db.reference(f"users/{interaction.user.id}").get()
-        credits_val = snap.get("credits", "0") if snap else "0"
-        await interaction.response.send_message(f"💰 יתרה נוכחית: **{credits_val}** קרדיטים", ephemeral=True)
-        
-    elif custom_id == "spam_phone":
-        await interaction.response.send_modal(SpamModal())
-        
-    # 🎁 הבלוק החדש שנוסף עבור הפרס היומי 🎁
-    elif custom_id == "daily_claim_btn":
-        user_ref = db.reference(f"users/{interaction.user.id}")
-        snap = user_ref.get()
-        
-        cur_credits = snap.get("credits", "0") if snap else "0"
-        last_claim = snap.get("last_claim", 0) if snap else 0
+ if custom_id == "my_credits":
+            try:
+                try:
+                    snap = db.reference(f"users/{user_id}").get()
+                    cur_credits = snap.get("credits", "0") if (snap and isinstance(snap, dict)) else "0"
+                except Exception as fb_err:
+                    # אם הטבלה לא קיימת (404) או כל שגיאת תקשורת
+                    cur_credits = "0"
+                    
+                await interaction.response.send_message(f"💰 יתרתך הנוכחית: **{cur_credits}** קרדיטים", ephemeral=True)
+            except Exception as e:
+                await interaction.response.send_message(f"❌ שגיאה בקריאת נתונים: {e}", ephemeral=True)
+            return
+
+        elif custom_id == "spam_phone":
+            await interaction.response.send_modal(SpamModal())
+            return
+
+        # 🎁 הבלוק החדש שמטפל בפרס היומי
+        elif custom_id == "daily_claim_btn":
+            try:
+                user_ref = db.reference(f"users/{user_id}")
+                try:
+                    snap = user_ref.get()
+                except Exception:
+                    snap = None
+                
+                if snap and isinstance(snap, dict):
+                    cur_credits = snap.get("credits", "0")
+                    last_claim = snap.get("last_claim", 0)
+                else:
+                    cur_credits = "0"
+                    last_claim = 0
         
         now_timestamp = int(time.time())
         cooldown_seconds = 24 * 3600  # 24 שעות בשניות
