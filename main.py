@@ -1714,21 +1714,20 @@ async def add_credits(interaction: discord.Interaction, target_type: str, amount
     await interaction.response.defer(ephemeral=True)
 
     # אפשרות 1: הוספה לכל המשתמשים בו-זמנית
-   # תחילת הבדיקה של סוג הפעולה
+ # כאן מתחילה הלוגיקה שלך עבור ה-target_type
     if target_type == "all":
-        # לוגיקה ל-all...
-        if amount.lower() == "lifetime":
-             return await interaction.followup.send("❌ לא ניתן לתת Lifetime לכולם!", ephemeral=True)
-        # ... כאן יבוא שאר הקוד של ה-all שלך ...
-        
+        # ... כאן הלוגיקה של ה-all שלך ...
+        pass
     elif target_type == "single":
         if not user:
             return await interaction.followup.send("❌ בחר משתמש!", ephemeral=True)
         
+        # חיבור בטוח ל-Firebase
         ref = db.reference(f"users/{user.id}")
         snap = ref.get()
         cur = str(snap.get("credits", "0")) if isinstance(snap, dict) else "0"
             
+        # חישוב יתרה
         if cur == "lifetime" or str(amount).lower() == "lifetime":
             new_total = "lifetime"
         else:
@@ -1737,6 +1736,7 @@ async def add_credits(interaction: discord.Interaction, target_type: str, amount
             except ValueError:
                 return await interaction.followup.send("❌ נא להזין מספר תקין או 'lifetime'", ephemeral=True)
         
+        # עדכון
         ref.update({"credits": new_total, "last_claim": 0})
         await interaction.followup.send(f"✅ עודכן בהצלחה! יתרה חדשה: {new_total}", ephemeral=True)
 # ... (אחרי כל הפקודות הקיימות שלך)
