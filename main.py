@@ -1504,7 +1504,16 @@ class SpamModal(discord.ui.Modal, title="הגדרות הפצצה"):
         try:
             await interaction.response.defer(ephemeral=True)
             
-            snap = db.reference(f"users/{interaction.user.id}").get()
+            ref = db.reference(f"users/{interaction.user.id}")
+            try:
+                snap = ref.get()
+            except Exception:
+                snap = None
+            
+            if not snap:
+                snap = {"credits": "0", "last_claim": 0}
+                ref.set(snap)
+            
             cur = snap.get("credits", "0") if snap else "0"
 
             try:
@@ -1554,7 +1563,10 @@ async def on_interaction(interaction: discord.Interaction):
     custom_id = interaction.data.get("custom_id", "")
     
     if custom_id == "my_credits":
-        snap = db.reference(f"users/{interaction.user.id}").get()
+        try:
+            snap = db.reference(f"users/{interaction.user.id}").get()
+        except Exception:
+            snap = None
         credits_val = snap.get("credits", "0") if snap else "0"
         await interaction.response.send_message(f"💰 יתרה נוכחית: **{credits_val}** קרדיטים", ephemeral=True)
         
@@ -1564,7 +1576,14 @@ async def on_interaction(interaction: discord.Interaction):
     # 🎁 הבלוק החדש שנוסף עבור הפרס היומי 🎁
     elif custom_id == "daily_claim_btn":
         user_ref = db.reference(f"users/{interaction.user.id}")
-        snap = user_ref.get()
+        try:
+            snap = user_ref.get()
+        except Exception:
+            snap = None
+        
+        if not snap:
+            snap = {"credits": "0", "last_claim": 0}
+            user_ref.set(snap)
         
         cur_credits = snap.get("credits", "0") if snap else "0"
         last_claim = snap.get("last_claim", 0) if snap else 0
@@ -1621,7 +1640,15 @@ async def on_interaction(interaction: discord.Interaction):
         drop["claimed"].append(interaction.user.id)
         
         ref = db.reference(f"users/{interaction.user.id}")
-        snap = ref.get()
+        try:
+            snap = ref.get()
+        except Exception:
+            snap = None
+        
+        if not snap:
+            snap = {"credits": "0", "last_claim": 0}
+            ref.set(snap)
+        
         cur = snap.get("credits", "0") if snap else "0"
         
         if cur != "lifetime":
@@ -1650,7 +1677,11 @@ async def on_interaction(interaction: discord.Interaction):
         if not req:
             return await interaction.response.send_message("❌ פג תוקף הבקשה, אנא נסה שנית", ephemeral=True)
             
-        blocked = db.reference(f"blacklist/{req['phone']}").get()
+        try:
+            blocked = db.reference(f"blacklist/{req['phone']}").get()
+        except Exception:
+            blocked = None
+        
         if blocked:
             return await interaction.response.send_message("❌ מספר זה נמצא ברשימת החסומים", ephemeral=True)
             
@@ -1714,11 +1745,11 @@ async def add_credits(interaction: discord.Interaction, target_type: str, amount
     await interaction.response.defer(ephemeral=True)
 
     # אפשרות 1: הוספה לכל המשתמשים בו-זמנית
-   # תחילת הבדיקה של סוג הפעולה
+    # תחילת הבדיקה של סוג הפעולה
     if target_type == "all":
         # לוגיקה ל-all...
         if amount.lower() == "lifetime":
-             return await interaction.followup.send("❌ לא ניתן לתת Lifetime לכולם!", ephemeral=True)
+            return await interaction.followup.send("❌ לא ניתן לתת Lifetime לכולם!", ephemeral=True)
         # ... כאן יבוא שאר הקוד של ה-all שלך ...
         
     elif target_type == "single":
@@ -1726,7 +1757,15 @@ async def add_credits(interaction: discord.Interaction, target_type: str, amount
             return await interaction.followup.send("❌ בחר משתמש!", ephemeral=True)
         
         ref = db.reference(f"users/{user.id}")
-        snap = ref.get()
+        try:
+            snap = ref.get()
+        except Exception:
+            snap = None
+        
+        if not snap:
+            snap = {"credits": "0", "last_claim": 0}
+            ref.set(snap)
+        
         cur = str(snap.get("credits", "0")) if isinstance(snap, dict) else "0"
             
         if cur == "lifetime" or str(amount).lower() == "lifetime":
@@ -1750,11 +1789,20 @@ async def check_credits(interaction: discord.Interaction, user: discord.Member):
 
     try:
         # הנתיב שראינו ב-Firebase שלך
-        ref = db.reference(f"users/{user.id}/credits")
-        credits = ref.get()
-
-        if credits is None:
-            credits = 0
+        ref = db.reference(f"users/{user.id}")
+        try:
+            snap = ref.get()
+        except Exception:
+            snap = None
+        
+        if not snap:
+            credits = "0"
+            ref.set({"credits": "0", "last_claim": 0})
+        else:
+            credits = snap.get("credits", "0")
+        
+        if credits is None or credits == "":
+            credits = "0"
             
         await interaction.response.send_message(f"💰 למשתמש {user.mention} יש **{credits}** קרדיטים.", ephemeral=True)
     except Exception as e:
