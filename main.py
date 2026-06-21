@@ -63,8 +63,8 @@ try:
         cred = credentials.Certificate(firebase_config)
         
     firebase_admin.initialize_app(cred, {
-'databaseURL': 'https://lidor-spammer-default-rtdb.firebaseio.com/'    })
-    print("✅ Firebase אותחל בהצלחה ומחובר ל-Nlhhhh!")
+'databaseURL': 'https://lidor-spammer-default-rtdb.firebaseio.com/'
+print("✅ Firebase אותחל בהצלחה ומחובר ל-lidor-spammer!")
 except Exception as e:
     print("Firebase Error:", e)
 
