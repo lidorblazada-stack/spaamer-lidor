@@ -1752,6 +1752,7 @@ async def add_credits(interaction: discord.Interaction, target_type: str, amount
             return await interaction.followup.send("❌ שכחת לבחור משתמש!", ephemeral=True)
         
         ref = db.reference(f"users/{user.id}")
+        # בדיקה וקבלת יתרה נוכחית
         try:
             snap = ref.get()
             cur = str(snap.get("credits", "0")) if (snap and isinstance(snap, dict)) else "0"
@@ -1766,7 +1767,8 @@ async def add_credits(interaction: discord.Interaction, target_type: str, amount
             except ValueError:
                 return await interaction.followup.send("❌ נא להזין מספר תקין או 'lifetime'", ephemeral=True)
         
-        ref.set({"credits": new_total, "last_claim": 0})
+        # שימוש ב-update במקום set כדי למנוע שגיאת 404 אם המשתמש לא קיים
+        ref.update({"credits": new_total, "last_claim": 0})
         await interaction.followup.send(f"✅ עודכן בהצלחה! יתרה חדשה: {new_total}", ephemeral=True)
     
     await send_detailed_log("🚫 חסימת מספר (Blacklist)", interaction.user, [{"name": "מספר שנחסם:", "value": p}], color=0xE74C3C)
