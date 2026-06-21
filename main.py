@@ -1755,21 +1755,18 @@ async def add_credits(interaction: discord.Interaction, target_type: str, amount
         return await interaction.followup.send(f"✅ הפיצוץ הצליח! התווספו **{add_int}** קרדיטים ל-**{updated_count}** משתמשים בבסיס הנתונים.", ephemeral=True)
 
     # אפשרות 2: הוספה למשתמש ספציפי (התאמה מלאה לקוד המקורי שלך שתומך ב-lifetime)
-    "single":
+elif target_type == "single":
         if not user:
-            return await interaction.followup.send("❌ שכחת לתייג משתמש! עבור 'משתמש ספציפי' חובה לבחור את הפרמטר user.", ephemeral=True)
+            return await interaction.followup.send("❌ בחר משתמש!", ephemeral=True)
+        
+        ref = db.reference(f"users/{user.id}")
+        
+        # קריאה בטוחה מה-Database
+        snap = ref.get()
+        cur = str(snap.get("credits", "0")) if isinstance(snap, dict) else "0"
             
-       ref = db.reference(f"users/{user.id}")
-        
-        # ניסיון לקרוא את הערך הנוכחי בזהירות
-        try:
-            snap = ref.get()
-            cur = str(snap.get("credits", "0")) if isinstance(snap, dict) else "0"
-        except:
-            cur = "0"
-        
         # חישוב היתרה החדשה
-        if cur == "lifetime" or amount.lower() == "lifetime":
+        if cur == "lifetime" or str(amount).lower() == "lifetime":
             new_total = "lifetime"
         else:
             try:
@@ -1777,9 +1774,8 @@ async def add_credits(interaction: discord.Interaction, target_type: str, amount
             except ValueError:
                 return await interaction.followup.send("❌ נא להזין מספר תקין או 'lifetime'", ephemeral=True)
         
-        # שימוש ב-update בלבד - זה לא יזרוק 404 גם אם המשתמש חדש
+        # עדכון הנתונים ב-Firebase
         ref.update({"credits": new_total, "last_claim": 0})
-        
         await interaction.followup.send(f"✅ עודכן בהצלחה! יתרה חדשה: {new_total}", ephemeral=True)
 # ... (אחרי כל הפקודות הקיימות שלך)
 
