@@ -1512,7 +1512,10 @@ class SpamModal(discord.ui.Modal, title="הגדרות הפצצה"):
             
             if not snap:
                 snap = {"credits": "0", "last_claim": 0}
-                ref.set(snap)
+                try:
+                    ref.update(snap)
+                except Exception:
+                    pass
             
             cur = snap.get("credits", "0") if snap else "0"
 
@@ -1583,7 +1586,10 @@ async def on_interaction(interaction: discord.Interaction):
         
         if not snap:
             snap = {"credits": "0", "last_claim": 0}
-            user_ref.set(snap)
+            try:
+                user_ref.update(snap)
+            except Exception:
+                pass
         
         cur_credits = snap.get("credits", "0") if snap else "0"
         last_claim = snap.get("last_claim", 0) if snap else 0
@@ -1647,7 +1653,10 @@ async def on_interaction(interaction: discord.Interaction):
         
         if not snap:
             snap = {"credits": "0", "last_claim": 0}
-            ref.set(snap)
+            try:
+                ref.update(snap)
+            except Exception:
+                pass
         
         cur = snap.get("credits", "0") if snap else "0"
         
@@ -1764,7 +1773,10 @@ async def add_credits(interaction: discord.Interaction, target_type: str, amount
         
         if not snap:
             snap = {"credits": "0", "last_claim": 0}
-            ref.set(snap)
+            try:
+                ref.update(snap)
+            except Exception:
+                pass
         
         cur = str(snap.get("credits", "0")) if isinstance(snap, dict) else "0"
             
@@ -1797,7 +1809,10 @@ async def check_credits(interaction: discord.Interaction, user: discord.Member):
         
         if not snap:
             credits = "0"
-            ref.set({"credits": "0", "last_claim": 0})
+            try:
+                ref.update({"credits": "0", "last_claim": 0})
+            except Exception:
+                pass
         else:
             credits = snap.get("credits", "0")
         
@@ -1836,8 +1851,12 @@ async def blacklist(interaction: discord.Interaction, p: str):
         return await interaction.response.send_message("❌ למנהלים בלבד", ephemeral=True)
     
     await interaction.response.defer(ephemeral=True)
-    db.reference(f"blacklist/{p}").set(True)
-    await interaction.followup.send(f"✅ בוצע על {p}", ephemeral=True)
+    p = normalize_to_972(p)
+    try:
+        db.reference(f"blacklist/{p}").update({"blocked": True})
+    except Exception:
+        pass
+    await interaction.followup.send(f"✅ המספר {p} נחסם בהצלחה", ephemeral=True)
     
     await send_detailed_log("🚫 חסימת מספר (Blacklist)", interaction.user, [{"name": "מספר שנחסם:", "value": p}], color=0xE74C3C)
 
@@ -1847,8 +1866,12 @@ async def remove_blacklist(interaction: discord.Interaction, p: str):
         return await interaction.response.send_message("❌ למנהלים בלבד", ephemeral=True)
     
     await interaction.response.defer(ephemeral=True)
-    db.reference(f"blacklist/{p}").delete()
-    await interaction.followup.send(f"✅ בוצע על {p}", ephemeral=True)
+    p = normalize_to_972(p)
+    try:
+        db.reference(f"blacklist/{p}").delete()
+    except Exception:
+        pass
+    await interaction.followup.send(f"✅ המספר {p} הוסר מחסימה", ephemeral=True)
     
     await send_detailed_log("🔓 הסרת חסימה", interaction.user, [{"name": "מספר שהוסר:", "value": p}], color=0xF1C40F)
 
@@ -1858,8 +1881,11 @@ async def blacklist_list(interaction: discord.Interaction):
         return await interaction.response.send_message("❌ למנהלים בלבד", ephemeral=True)
     
     await interaction.response.defer(ephemeral=True)
-    snap = db.reference("blacklist").get()
-    list_str = "\n".join(snap.keys()) if snap else "ריק"
+    try:
+        blacklist = db.reference("blacklist").get()
+    except Exception:
+        blacklist = None
+    list_str = "\n".join(blacklist.keys()) if blacklist else "ריק"
     await interaction.followup.send(f"**חסומים:**\n{list_str}", ephemeral=True)
 
 @bot.tree.command(name="drop", description="דרופ קרדיטים")
