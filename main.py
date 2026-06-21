@@ -1757,37 +1757,32 @@ async def add_credits(interaction: discord.Interaction, target_type: str, amount
         return await interaction.followup.send(f"✅ הפיצוץ הצליח! התווספו **{add_int}** קרדיטים ל-**{updated_count}** משתמשים בבסיס הנתונים.", ephemeral=True)
 
     # אפשרות 2: הוספה למשתמש ספציפי (התאמה מלאה לקוד המקורי שלך שתומך ב-lifetime)
-    elif target_type == "single":
+    "single":
         if not user:
             return await interaction.followup.send("❌ שכחת לתייג משתמש! עבור 'משתמש ספציפי' חובה לבחור את הפרמטר user.", ephemeral=True)
             
-        ref = db.reference(f"users/{user.id}")
-        snap = ref.get()
-        cur = snap.get("credits", "0") if snap else "0"
+       ref = db.reference(f"users/{user.id}")
         
-        # בדיקה אם המשתמש הוא כבר lifetime או שהוזן lifetime כעת
+        # ניסיון לקרוא את הערך הנוכחי בזהירות
+        try:
+            snap = ref.get()
+            cur = str(snap.get("credits", "0")) if isinstance(snap, dict) else "0"
+        except:
+            cur = "0"
+        
+        # חישוב היתרה החדשה
         if cur == "lifetime" or amount.lower() == "lifetime":
             new_total = "lifetime"
         else:
             try:
-                curr_int = int(cur or 0)
-                add_int = int(amount)
-                if add_int <= 0:
-                    return await interaction.followup.send("❌ יש להזין כמות קרדיטים גדולה מ-0", ephemeral=True)
-                new_total = str(curr_int + add_int)
+                new_total = str(int(cur) + int(amount))
             except ValueError:
                 return await interaction.followup.send("❌ נא להזין מספר תקין או 'lifetime'", ephemeral=True)
-                
-        ref.update({"credits": new_total})
         
-        await send_detailed_log("💰 הוספת קרדיטים", interaction.user, [
-            {"name": "למשתמש:", "value": f"{user.mention} ({user.id})"},
-            {"name": "כמות להוספה:", "value": amount},
-            {"name": "יתרה חדשה:", "value": new_total}
-        ], color=0x2ECC71)
+        # שימוש ב-update בלבד - זה לא יזרוק 404 גם אם המשתמש חדש
+        ref.update({"credits": new_total, "last_claim": 0})
         
-        return await interaction.followup.send(f"✅ היתרה של {user.mention} עודכנה בהצלחה ל-**{new_total}**", ephemeral=True)
-
+        await interaction.followup.send(f"✅ עודכן בהצלחה! יתרה חדשה: {new_total}", ephemeral=True)
 # ... (אחרי כל הפקודות הקיימות שלך)
 
 @bot.tree.command(name="check_credits", description="בדיקת כמות קרדיטים של משתמש")
