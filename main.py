@@ -1719,21 +1719,6 @@ async def setup(interaction: discord.Interaction):
     
     await interaction.response.send_message(embed=embed, view=view)
     await send_detailed_log("⚙️ פקודת Setup", interaction.user, [{"name": "פעולה:", "value": "פתח את לוח הבקרה"}], color=0x2b2d31)
-
-@bot.tree.command(name="cancel_spam", description="בטל ספאם פעיל שנמצא בתהליך")
-async def cancel_spam(interaction: discord.Interaction):
-    task = active_spam_tasks.pop(interaction.user.id, None)
-    if task is None:
-        return await interaction.response.send_message("אין ספאם פעיל לביטול.", ephemeral=True)
-
-    task.cancel()
-    await interaction.response.send_message("מבצע ביטול של הספאם. הריצה נעצרה.", ephemeral=True)
-
-@bot.tree.command(name="add", description="הוספת קרדיטים למשתמש ספציפי (כולל lifetime) או לכל המשתמשים בבת אחת")
-@app_commands.choices(target_type=[
-    app_commands.Choice(name="משתמש ספציפי", value="single"),
-    app_commands.Choice(name="כל המשתמשים ב-Firebase", value="all")
-])
 @bot.tree.command(name="add", description="הוספת קרדיטים למשתמש")
 @app_commands.choices(target_type=[
     app_commands.Choice(name="משתמש ספציפי", value="single"),
@@ -1745,7 +1730,7 @@ async def add_credits(interaction: discord.Interaction, target_type: str, amount
     
     await interaction.response.defer(ephemeral=True)
 
-    # אפשרות 1: עדכון כל המשתמשים
+    # 1. עדכון כל המשתמשים
     if target_type == "all":
         try:
             users_ref = db.reference("users")
@@ -1761,7 +1746,7 @@ async def add_credits(interaction: discord.Interaction, target_type: str, amount
         except Exception as e:
             await interaction.followup.send(f"❌ שגיאה בעדכון גורף: {e}", ephemeral=True)
 
-    # אפשרות 2: עדכון משתמש בודד
+    # 2. עדכון משתמש בודד
     elif target_type == "single":
         if not user:
             return await interaction.followup.send("❌ שכחת לבחור משתמש!", ephemeral=True)
