@@ -1837,8 +1837,11 @@ async def set_credits(interaction: discord.Interaction, u: discord.User, a: str)
         except ValueError: return await interaction.followup.send("❌ נא להזין מספר תקין או 'lifetime'", ephemeral=True)
             
     ref = db.reference(f"users/{u.id}")
-    ref.update({"credits": a})
-    await interaction.followup.send(f"✅ היתרה של {u.name} נקבעה ל-{a}", ephemeral=True)
+    try:
+        ref.update({"credits": a})
+        await interaction.followup.send(f"✅ היתרה של {u.name} נקבעה ל-{a}", ephemeral=True)
+    except Exception as e:
+        await interaction.followup.send(f"❌ לא ניתן לעדכן את היתרה: {type(e).__name__}", ephemeral=True)
     
     await send_detailed_log("⚙️ קביעת יתרה קבועה", interaction.user, [
         {"name": "יעד:", "value": u.mention},
@@ -1922,8 +1925,11 @@ async def leaderboard(interaction: discord.Interaction, count: int = 10):
     await interaction.response.defer(ephemeral=False)
     
     users_ref = db.reference("users")
-    all_users = users_ref.get()
-    
+    try:
+        all_users = users_ref.get()
+    except Exception:
+        all_users = None
+
     if not all_users:
         return await interaction.followup.send("❌ אין נתונים בשרת.", ephemeral=True)
     
