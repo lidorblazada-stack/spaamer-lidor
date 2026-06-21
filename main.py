@@ -53,22 +53,23 @@ active_spam_tasks: dict[int, asyncio.Task] = {}
 tempRequests = {}
 activeDrops = {}
 
-# --- חיבור ל-Firebase ---
+# --- חיבור מאובטח ל-Firebase ---
 try:
-    firebase_config = json.loads(os.getenv("FIREBASE_CONFIG", "{}"))
-    # אם הקובץ לא נטען דרך משתני סביבה, הבוט ינסה להשתמש בקובץ JSON מקומי
-    if not firebase_config:
-        cred = credentials.Certificate("serviceAccountKey.json")
+    firebase_config_raw = os.getenv("FIREBASE_CONFIG")
+    if firebase_config_raw and firebase_config_raw.strip():
+        try:
+            firebase_config = json.loads(firebase_config_raw.strip())
+            cred = credentials.Certificate(firebase_config)
+            firebase_admin.initialize_app(cred, {
+                'databaseURL': 'https://lidor-spammer-default-rtdb.firebaseio.com'
+            })
+            print("✅ Firebase מחובר בהצלחה!")
+        except Exception as json_err:
+            print("⚠️ שגיאה בפענוח ה-JSON של פיירבייס, מדלג:", json_err)
     else:
-        cred = credentials.Certificate(firebase_config)
-        
-   firebase_admin.initialize_app(cred, {
-            'databaseURL': 'https://lidor-spammer-default-rtdb.firebaseio.com'
-        })
-    print("✅ Firebase אותחל בהצלחה ומחובר ל-Nlhhhh!")
+        print("⚠️ אזהרה: משתנה הסביבה FIREBASE_CONFIG לא מוגדר בסביבה זו.")
 except Exception as e:
-    print("Firebase Error:", e)
-
+    print("❌ שגיאה כללית באתחול Firebase:", e)
 
 # --- פונקציות עזר וניהול הרשאות ---
 def is_manager(interaction: discord.Interaction) -> bool:
