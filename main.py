@@ -1745,7 +1745,7 @@ async def add_credits(interaction: discord.Interaction, target_type: str, amount
     
     await interaction.response.defer(ephemeral=True)
 
-    # --- אפשרות 1: הוספה לכולם ---
+    # אפשרות 1: עדכון כל המשתמשים
     if target_type == "all":
         try:
             users_ref = db.reference("users")
@@ -1761,7 +1761,7 @@ async def add_credits(interaction: discord.Interaction, target_type: str, amount
         except Exception as e:
             await interaction.followup.send(f"❌ שגיאה בעדכון גורף: {e}", ephemeral=True)
 
-    # --- אפשרות 2: משתמש בודד ---
+    # אפשרות 2: עדכון משתמש בודד
     elif target_type == "single":
         if not user:
             return await interaction.followup.send("❌ שכחת לבחור משתמש!", ephemeral=True)
@@ -1783,55 +1783,6 @@ async def add_credits(interaction: discord.Interaction, target_type: str, amount
         
         ref.set({"credits": new_total, "last_claim": 0})
         await interaction.followup.send(f"✅ עודכן בהצלחה! יתרה חדשה: {new_total}", ephemeral=True)
-@bot.tree.command(name="check_credits", description="בדיקת כמות קרדיטים של משתמש")
-@app_commands.describe(user="המשתמש שאתה רוצה לבדוק")
-async def check_credits(interaction: discord.Interaction, user: discord.Member):
-    # בדיקה אם המשתמש מורשה (הפונקציה is_manager צריכה להיות מוגדרת אצלך בקוד)
-    if not is_manager(interaction):
-        return await interaction.response.send_message("❌ אין לך הרשאה להשתמש בפקודה זו", ephemeral=True)
-
-    try:
-        # הנתיב שראינו ב-Firebase שלך
-        ref = db.reference(f"users/{user.id}/credits")
-        credits = ref.get()
-
-        if credits is None:
-            credits = 0
-            
-        await interaction.response.send_message(f"💰 למשתמש {user.mention} יש **{credits}** קרדיטים.", ephemeral=True)
-    except Exception as e:
-        await interaction.response.send_message(f"❌ אירעה שגיאה בבדיקת הקרדיטים: {e}", ephemeral=True)
-
-# ... (שאר הקוד של הבוט)
-
-
-@bot.tree.command(name="set", description="קביעת יתרה")
-async def set_credits(interaction: discord.Interaction, u: discord.User, a: str):
-    if not is_manager(interaction):
-        return await interaction.response.send_message("❌ למנהלים בלבד", ephemeral=True)
-    
-    await interaction.response.defer(ephemeral=True)
-    if a.lower() != "lifetime":
-        try: int(a)
-        except ValueError: return await interaction.followup.send("❌ נא להזין מספר תקין או 'lifetime'", ephemeral=True)
-            
-    ref = db.reference(f"users/{u.id}")
-    ref.update({"credits": a})
-    await interaction.followup.send(f"✅ היתרה של {u.name} נקבעה ל-{a}", ephemeral=True)
-    
-    await send_detailed_log("⚙️ קביעת יתרה קבועה", interaction.user, [
-        {"name": "יעד:", "value": u.mention},
-        {"name": "יתרה שנקבעה:", "value": a}
-    ], color=0x3498DB)
-
-@bot.tree.command(name="blacklist", description="חסימת מספר")
-async def blacklist(interaction: discord.Interaction, p: str):
-    if not is_manager(interaction):
-        return await interaction.response.send_message("❌ למנהלים בלבד", ephemeral=True)
-    
-    await interaction.response.defer(ephemeral=True)
-    db.reference(f"blacklist/{p}").set(True)
-    await interaction.followup.send(f"✅ בוצע על {p}", ephemeral=True)
     
     await send_detailed_log("🚫 חסימת מספר (Blacklist)", interaction.user, [{"name": "מספר שנחסם:", "value": p}], color=0xE74C3C)
 
