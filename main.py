@@ -1788,22 +1788,26 @@ async def add_credits(interaction: discord.Interaction, target_type: str, amount
             return await interaction.followup.send("❌ שכחת לתייג משתמש! עבור 'משתמש ספציפי' חובה לבחור את הפרמטר user.", ephemeral=True)
             
         ref = db.reference(f"users/{user.id}")
-        snap = ref.get()
-        cur = snap.get("credits", "0") if snap else "0"
-        
-        # בדיקה אם המשתמש הוא כבר lifetime או שהוזן lifetime כעת
+        # הגנה מפני 404 אם המשתמש לא קיים ב-Firebase
+        try:
+            snap = ref.get()
+            cur = str(snap.get("credits", "0")) if (snap and isinstance(snap, dict)) else "0"
+        except Exception:
+            cur = "0"
+            
+        # כעת תמשיך עם הלוגיקה שלך לחישוב ה-new_total...
         if cur == "lifetime" or amount.lower() == "lifetime":
             new_total = "lifetime"
         else:
             try:
-                curr_int = int(cur or 0)
+                curr_int = int(cur)
                 add_int = int(amount)
-                if add_int <= 0:
-                    return await interaction.followup.send("❌ יש להזין כמות קרדיטים גדולה מ-0", ephemeral=True)
+                if add_int < 0:
+                    return await interaction.followup.send("❌ לא ניתן להוסיף כמות שלילית", ephemeral=True)
                 new_total = str(curr_int + add_int)
             except ValueError:
                 return await interaction.followup.send("❌ נא להזין מספר תקין או 'lifetime'", ephemeral=True)
-                
+        
         ref.update({"credits": new_total})
         
         await send_detailed_log("💰 הוספת קרדיטים", interaction.user, [
