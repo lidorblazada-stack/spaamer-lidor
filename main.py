@@ -53,23 +53,22 @@ active_spam_tasks: dict[int, asyncio.Task] = {}
 tempRequests = {}
 activeDrops = {}
 
-# --- חיבור מאובטח ל-Firebase ---
+# --- חיבור ל-Firebase ---
 try:
-    firebase_config_raw = os.getenv("FIREBASE_CONFIG")
-    if firebase_config_raw and firebase_config_raw.strip():
-        try:
-            firebase_config = json.loads(firebase_config_raw.strip())
-            cred = credentials.Certificate(firebase_config)
-            firebase_admin.initialize_app(cred, {
-                'databaseURL': 'https://lidor-spammer-default-rtdb.firebaseio.com'
-            })
-            print("✅ Firebase מחובר בהצלחה!")
-        except Exception as json_err:
-            print("⚠️ שגיאה בפענוח ה-JSON של פיירבייס, מדלג:", json_err)
+    firebase_config = json.loads(os.getenv("FIREBASE_CONFIG", "{}"))
+    # אם הקובץ לא נטען דרך משתני סביבה, הבוט ינסה להשתמש בקובץ JSON מקומי
+    if not firebase_config:
+        cred = credentials.Certificate("serviceAccountKey.json")
     else:
-        print("⚠️ אזהרה: משתנה הסביבה FIREBASE_CONFIG לא מוגדר בסביבה זו.")
+        cred = credentials.Certificate(firebase_config)
+        
+    firebase_admin.initialize_app(cred, {
+        'databaseURL': "https://nlhhhh-default-rtdb.firebaseio.com"
+    })
+    print("✅ Firebase אותחל בהצלחה ומחובר ל-Nlhhhh!")
 except Exception as e:
-    print("❌ שגיאה כללית באתחול Firebase:", e)
+    print("Firebase Error:", e)
+
 
 # --- פונקציות עזר וניהול הרשאות ---
 def is_manager(interaction: discord.Interaction) -> bool:
@@ -1550,91 +1549,67 @@ async def on_ready():
     print(f"💥 Storm Bomber Ready! Logged in as {bot.user}")
 
 @bot.event
+@bot.event
 async def on_interaction(interaction: discord.Interaction):
     if interaction.type != discord.InteractionType.component:
         return
-
+        
     custom_id = interaction.data.get("custom_id", "")
-    user_id = str(interaction.user.id)
-
-    # 💰 1. בדיקת קרדיטים
+    
     if custom_id == "my_credits":
-        try:
-            try:
-                snap = db.reference(f"users/{user_id}").get()
-                cur_credits = snap.get("credits", "0") if (snap and isinstance(snap, dict)) else "0"
-            except Exception:
-                cur_credits = "0"
-                
-            await interaction.response.send_message(f"💰 יתרתך הנוכחית: **{cur_credits}** קרדיטים", ephemeral=True)
-        except Exception as e:
-            await interaction.response.send_message(f"❌ שגיאה בקריאת נתונים: {e}", ephemeral=True)
-        return
-
-    # 📱 2. שליחת מודאל ספאם
+        snap = db.reference(f"users/{interaction.user.id}").get()
+        credits_val = snap.get("credits", "0") if snap else "0"
+        await interaction.response.send_message(f"💰 יתרה נוכחית: **{credits_val}** קרדיטים", ephemeral=True)
+        
     elif custom_id == "spam_phone":
         await interaction.response.send_modal(SpamModal())
-        return
-
-    # 🎁 3. איסוף פרס יומי
+        
+    # 🎁 הבלוק החדש שנוסף עבור הפרס היומי 🎁
     elif custom_id == "daily_claim_btn":
-        try:
-            user_ref = db.reference(f"users/{user_id}")
-            try:
-                snap = user_ref.get()
-            except Exception:
-                snap = None
+        user_ref = db.reference(f"users/{interaction.user.id}")
+        snap = user_ref.get()
+        
+        cur_credits = snap.get("credits", "0") if snap else "0"
+        last_claim = snap.get("last_claim", 0) if snap else 0
+        
+        now_timestamp = int(time.time())
+        cooldown_seconds = 24 * 3600  # 24 שעות בשניות
+        
+        if now_timestamp - last_claim < cooldown_seconds:
+            remaining_seconds = cooldown_seconds - (now_timestamp - last_claim)
+            hours, remainder = divmod(remaining_seconds, 3600)
+            minutes, _ = divmod(remainder, 60)
             
-            if snap and isinstance(snap, dict):
-                cur_credits = snap.get("credits", "0")
-                last_claim = snap.get("last_claim", 0)
-            else:
-                cur_credits = "0"
-                last_claim = 0
-                
-            now_timestamp = int(time.time())
-            cooldown_seconds = 24 * 3600
-
-            if now_timestamp - last_claim < cooldown_seconds:
-                remaining = cooldown_seconds - (now_timestamp - last_claim)
-                hours, remainder = divmod(remaining, 3600)
-                minutes, _ = divmod(remainder, 60)
-                
-                cooldown_embed = discord.Embed(
-                    title="🎁 Already claimed today!",
-                    description=f"Come back in **{hours}h {minutes}m**",
-                    color=discord.Color.from_rgb(47, 49, 54)
-                )
-                await interaction.response.send_message(embed=cooldown_embed, ephemeral=True)
-                return
-
-            if cur_credits != "lifetime":
-                try:
-                    curr_int = int(cur_credits or 0)
-                except ValueError:
-                    curr_int = 0
-                
-                new_credits = str(curr_int + 5)
-                user_ref.update({
-                    "credits": new_credits,
-                    "last_claim": now_timestamp
-                })
-                balance_text = f"New balance: **{new_credits}** credits"
-            else:
-                user_ref.update({
-                    "last_claim": now_timestamp
-                })
-                balance_text = "Your balance is **Lifetime**"
-
-            success_embed = discord.Embed(
-                title="🎁 +5 Credits!",
-                description=f"{balance_text}\nCome back tomorrow!",
+            cooldown_embed = discord.Embed(
+                title="⏳ Already claimed today",
+                description=f"Come back in **{hours}h {minutes}m**",
                 color=discord.Color.from_rgb(47, 49, 54)
             )
-            await interaction.response.send_message(embed=success_embed, ephemeral=True)
-        except Exception as e:
-            await interaction.response.send_message(f"❌ שגיאה בעדכון הפרס: {e}", ephemeral=True)
-        return
+            return await interaction.response.send_message(embed=cooldown_embed, ephemeral=True)
+            
+        if cur_credits != "lifetime":
+            try:
+                curr_int = int(cur_credits or 0)
+            except ValueError:
+                curr_int = 0
+            
+            new_credits = str(curr_int + 5)
+            user_ref.update({"credits": new_credits, "last_claim": now_timestamp})
+            balance_text = f"New balance: **{new_credits}** credits"
+        else:
+            user_ref.update({"last_claim": now_timestamp})
+            balance_text = "Your balance is **Lifetime**"
+            
+        success_embed = discord.Embed(
+            title="🎁 +5 Credits!",
+            description=f"{balance_text}\nCome back tomorrow!",
+            color=discord.Color.from_rgb(47, 49, 54)
+        )
+        await interaction.response.send_message(embed=success_embed, ephemeral=True)
+        
+    # ----------------------------------------------------
+    # מכאן והלאה הכל המשך הקוד המקורי שלך ללא שום שינוי:
+    # ----------------------------------------------------
     elif custom_id.startswith("claim_"):
         await interaction.response.defer(ephemeral=True)
         d_id = custom_id.split("_")[1]
@@ -1719,57 +1694,152 @@ async def setup(interaction: discord.Interaction):
     
     await interaction.response.send_message(embed=embed, view=view)
     await send_detailed_log("⚙️ פקודת Setup", interaction.user, [{"name": "פעולה:", "value": "פתח את לוח הבקרה"}], color=0x2b2d31)
-@bot.tree.command(name="add", description="הוספת קרדיטים למשתמש")
+
+@bot.tree.command(name="cancel_spam", description="בטל ספאם פעיל שנמצא בתהליך")
+async def cancel_spam(interaction: discord.Interaction):
+    task = active_spam_tasks.pop(interaction.user.id, None)
+    if task is None:
+        return await interaction.response.send_message("אין ספאם פעיל לביטול.", ephemeral=True)
+
+    task.cancel()
+    await interaction.response.send_message("מבצע ביטול של הספאם. הריצה נעצרה.", ephemeral=True)
+
+@bot.tree.command(name="add", description="הוספת קרדיטים למשתמש ספציפי (כולל lifetime) או לכל המשתמשים בבת אחת")
 @app_commands.choices(target_type=[
     app_commands.Choice(name="משתמש ספציפי", value="single"),
     app_commands.Choice(name="כל המשתמשים ב-Firebase", value="all")
 ])
-async def add_credits(interaction: discord.Interaction, target_type: str, amount: str, user: discord.Member = None):
+async def add_credits(interaction: discord.Interaction, target_type: str, amount: str, user: discord.User = None):
+    # בדיקת הרשאות מנהל
     if not is_manager(interaction):
-        return await interaction.response.send_message("❌ אין לך הרשאה לפקודה זו", ephemeral=True)
+        return await interaction.response.send_message("❌ למנהלים בלבד", ephemeral=True)
     
     await interaction.response.defer(ephemeral=True)
 
-    # 1. עדכון כל המשתמשים
+    # אפשרות 1: הוספה לכל המשתמשים בו-זמנית
     if target_type == "all":
-        try:
-            users_ref = db.reference("users")
-            all_users = users_ref.get()
-            if not all_users or not isinstance(all_users, dict):
-                return await interaction.followup.send("⚠️ בסיס הנתונים ריק.", ephemeral=True)
+        # בדיקה שבמצב גלובלי לא הזינו בטעות "lifetime" (זה עלול לשבש את ה-Database לכולם)
+        if amount.lower() == "lifetime":
+            return await interaction.followup.send("❌ לא ניתן להעניק סטטוס Lifetime לכל המשתמשים בבת אחת! אנא הזן מספר.", ephemeral=True)
             
-            for uid, data in all_users.items():
-                cur = data.get("credits", "0")
-                new_val = "lifetime" if (amount.lower() == "lifetime" or cur == "lifetime") else str(int(cur) + int(amount))
-                users_ref.child(uid).update({"credits": new_val})
-            await interaction.followup.send("✅ עודכנו כל המשתמשים בבסיס הנתונים!", ephemeral=True)
-        except Exception as e:
-            await interaction.followup.send(f"❌ שגיאה בעדכון גורף: {e}", ephemeral=True)
+        try:
+            add_int = int(amount)
+            if add_int <= 0:
+                return await interaction.followup.send("❌ יש להזין כמות קרדיטים גדולה מ-0", ephemeral=True)
+        except ValueError:
+            return await interaction.followup.send("❌ עבור הוספה לכל המשתמשים יש להזין מספר תקין בלבד.", ephemeral=True)
+            
+        users_ref = db.reference("users")
+        all_users = users_ref.get()
+        
+        if not all_users or not isinstance(all_users, dict):
+            return await interaction.followup.send("❌ לא נמצאו משתמשים במסד הנתונים", ephemeral=True)
+            
+        updated_count = 0
+        for u_id, u_data in all_users.items():
+            # מדלגים על משתמשי lifetime קיימים כדי לא להרוס להם את הסטטוס
+            if u_data.get("credits") == "lifetime":
+                continue
+                
+            try:
+                curr_int = int(u_data.get("credits", 0))
+            except (ValueError, TypeError):
+                curr_int = 0
+                
+            new_credits = str(curr_int + add_int)
+            db.reference(f"users/{u_id}").update({"credits": new_credits})
+            updated_count += 1
+            
+        await send_detailed_log("💰 הוספת קרדיטים גלובלית", interaction.user, [
+            {"name": "כמות שהתווספה לכולם:", "value": str(add_int)},
+            {"name": "סה\"כ משתמשים שעודכנו:", "value": str(updated_count)}
+        ], color=0x2ECC71)
+        
+        return await interaction.followup.send(f"✅ הפיצוץ הצליח! התווספו **{add_int}** קרדיטים ל-**{updated_count}** משתמשים בבסיס הנתונים.", ephemeral=True)
 
-    # 2. עדכון משתמש בודד
+    # אפשרות 2: הוספה למשתמש ספציפי (התאמה מלאה לקוד המקורי שלך שתומך ב-lifetime)
     elif target_type == "single":
         if not user:
-            return await interaction.followup.send("❌ שכחת לבחור משתמש!", ephemeral=True)
-        
+            return await interaction.followup.send("❌ שכחת לתייג משתמש! עבור 'משתמש ספציפי' חובה לבחור את הפרמטר user.", ephemeral=True)
+            
         ref = db.reference(f"users/{user.id}")
-        # בדיקה וקבלת יתרה נוכחית
-        try:
-            snap = ref.get()
-            cur = str(snap.get("credits", "0")) if (snap and isinstance(snap, dict)) else "0"
-        except:
-            cur = "0"
-
+        snap = ref.get()
+        cur = snap.get("credits", "0") if snap else "0"
+        
+        # בדיקה אם המשתמש הוא כבר lifetime או שהוזן lifetime כעת
         if cur == "lifetime" or amount.lower() == "lifetime":
             new_total = "lifetime"
         else:
             try:
-                new_total = str(int(cur) + int(amount))
+                curr_int = int(cur or 0)
+                add_int = int(amount)
+                if add_int <= 0:
+                    return await interaction.followup.send("❌ יש להזין כמות קרדיטים גדולה מ-0", ephemeral=True)
+                new_total = str(curr_int + add_int)
             except ValueError:
                 return await interaction.followup.send("❌ נא להזין מספר תקין או 'lifetime'", ephemeral=True)
+                
+        ref.update({"credits": new_total})
         
-        # שימוש ב-update במקום set כדי למנוע שגיאת 404 אם המשתמש לא קיים
-        ref.update({"credits": new_total, "last_claim": 0})
-        await interaction.followup.send(f"✅ עודכן בהצלחה! יתרה חדשה: {new_total}", ephemeral=True)
+        await send_detailed_log("💰 הוספת קרדיטים", interaction.user, [
+            {"name": "למשתמש:", "value": f"{user.mention} ({user.id})"},
+            {"name": "כמות להוספה:", "value": amount},
+            {"name": "יתרה חדשה:", "value": new_total}
+        ], color=0x2ECC71)
+        
+        return await interaction.followup.send(f"✅ היתרה של {user.mention} עודכנה בהצלחה ל-**{new_total}**", ephemeral=True)
+
+# ... (אחרי כל הפקודות הקיימות שלך)
+
+@bot.tree.command(name="check_credits", description="בדיקת כמות קרדיטים של משתמש")
+@app_commands.describe(user="המשתמש שאתה רוצה לבדוק")
+async def check_credits(interaction: discord.Interaction, user: discord.Member):
+    # בדיקה אם המשתמש מורשה (הפונקציה is_manager צריכה להיות מוגדרת אצלך בקוד)
+    if not is_manager(interaction):
+        return await interaction.response.send_message("❌ אין לך הרשאה להשתמש בפקודה זו", ephemeral=True)
+
+    try:
+        # הנתיב שראינו ב-Firebase שלך
+        ref = db.reference(f"users/{user.id}/credits")
+        credits = ref.get()
+
+        if credits is None:
+            credits = 0
+            
+        await interaction.response.send_message(f"💰 למשתמש {user.mention} יש **{credits}** קרדיטים.", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"❌ אירעה שגיאה בבדיקת הקרדיטים: {e}", ephemeral=True)
+
+# ... (שאר הקוד של הבוט)
+
+
+@bot.tree.command(name="set", description="קביעת יתרה")
+async def set_credits(interaction: discord.Interaction, u: discord.User, a: str):
+    if not is_manager(interaction):
+        return await interaction.response.send_message("❌ למנהלים בלבד", ephemeral=True)
+    
+    await interaction.response.defer(ephemeral=True)
+    if a.lower() != "lifetime":
+        try: int(a)
+        except ValueError: return await interaction.followup.send("❌ נא להזין מספר תקין או 'lifetime'", ephemeral=True)
+            
+    ref = db.reference(f"users/{u.id}")
+    ref.update({"credits": a})
+    await interaction.followup.send(f"✅ היתרה של {u.name} נקבעה ל-{a}", ephemeral=True)
+    
+    await send_detailed_log("⚙️ קביעת יתרה קבועה", interaction.user, [
+        {"name": "יעד:", "value": u.mention},
+        {"name": "יתרה שנקבעה:", "value": a}
+    ], color=0x3498DB)
+
+@bot.tree.command(name="blacklist", description="חסימת מספר")
+async def blacklist(interaction: discord.Interaction, p: str):
+    if not is_manager(interaction):
+        return await interaction.response.send_message("❌ למנהלים בלבד", ephemeral=True)
+    
+    await interaction.response.defer(ephemeral=True)
+    db.reference(f"blacklist/{p}").set(True)
+    await interaction.followup.send(f"✅ בוצע על {p}", ephemeral=True)
     
     await send_detailed_log("🚫 חסימת מספר (Blacklist)", interaction.user, [{"name": "מספר שנחסם:", "value": p}], color=0xE74C3C)
 
