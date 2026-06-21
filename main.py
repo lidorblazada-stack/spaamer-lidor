@@ -1734,31 +1734,73 @@ async def cancel_spam(interaction: discord.Interaction):
     app_commands.Choice(name="משתמש ספציפי", value="single"),
     app_commands.Choice(name="כל המשתמשים ב-Firebase", value="all")
 ])
+@bot.tree.command(name="add", description="הוספת קרדיטים למשתמש")
+@app_commands.choices(target_type=[
+    app_commands.Choice(name="משתמש ספציפי", value="single"),
+    app_commands.Choice(name="כל המשתמשים ב-Firebase", value="all")
+])
 async def add_credits(interaction: discord.Interaction, target_type: str, amount: str, user: discord.User = None):
-    # בדיקת הרשאות מנהל
     if not is_manager(interaction):
-        return await interaction.response.send_message("❌ למנהלים בלבד", ephemeral=True)
+        return await interaction.response.send_message("❌ אין לך הרשאה לפקודה זו", ephemeral=True)
     
     await interaction.response.defer(ephemeral=True)
 
-    # אפשרות 1: הוספה לכל המשתמשים בו-זמנית
+    # --- אפשרות 1: הוספה לכולם ---
     if target_type == "all":
-        # בדיקה שבמצב גלובלי לא הזינו בטעות "lifetime" (זה עלול לשבש את ה-Database לכולם)
-        if amount.lower() == "lifetime":
-            return await interaction.followup.send("❌ לא ניתן להעניק סטטוס Lifetime לכל המשתמשים בבת אחת! אנא הזן מספר.", ephemeral=True)
-            
         try:
-            add_int = int(amount)
-            if add_int <= 0:
-                return await interaction.followup.send("❌ יש להזין כמות קרדיטים גדולה מ-0", ephemeral=True)
-        except ValueError:
-            return await interaction.followup.send("❌ עבור הוספה לכל המשתמשים יש להזין מספר תקין בלבד.", ephemeral=True)
+            users_ref = db.reference("users")
+            all_users = users_ref.get()
             
-        users_ref = db.reference("users")
-        all_users = users_ref.get()
+            if not all_users or not isinstance(all_users, dict):
+                return await interaction.followup.send("⚠️ בסיס הנתונים ריק, אין משתמשים לעדכן.", ephemeral=True)
+            
+            for uid, data in all_users.items():
+                cur = data.get("credits", "0")
+                if amount.lower() == "lifetime":
+                    new_val = "lifetime"
+                elif cur != "lifetime":
+                    new_val = str(int(cur) + int(amount))
+                else:
+                    new_val = "lifetime"
+                
+                users_ref.child(uid).update({"credits": new_val})
+            await interaction.followup.send("✅ עודכנו כל המשתמשים בבסיס הנתונים!", ephemeral=True)
+        except Exception as e:
+            await interaction.followup.send(f"❌ שגיאה בעדכון גורף: {e}", ephemeral=True)
+
+   elif target_type == "single":
+        if not user:
+            return await interaction.followup.send("❌ שכחת לבחור משתמש!", ephemeral=True)
+            
+        ref = db.reference(f"users/{user.id}")
         
-        if not all_users or not isinstance(all_users, dict):
-            return await interaction.followup.send("❌ לא נמצאו משתמשים במסד הנתונים", ephemeral=True)
+        # 1. ניסיון משיכת נתונים (עם הגנת 404)
+        try:
+            snap = ref.get()
+            cur = str(snap.get("credits", "0")) if (snap and isinstance(snap, dict)) else "0"
+        except Exception:
+            cur = "0"
+
+        # 2. חישוב הערך החדש
+        if cur == "lifetime" or amount.lower() == "lifetime":
+            new_total = "lifetime"
+        else:
+            try:
+                add_int = int(amount)
+                if add_int < 0:
+                    return await interaction.followup.send("❌ לא ניתן להוסיף כמות שלילית", ephemeral=True)
+                new_total = str(int(cur) + add_int)
+            except ValueError:
+                return await interaction.followup.send("❌ נא להזין מספר תקין או 'lifetime'", ephemeral=True)
+        
+        # 3. עדכון ב-Firebase (שימוש ב-set ליצירה או עדכון)
+        ref.set({
+            "credits": new_total,
+            "last_claim": 0 
+        })
+        
+        # 4. הודעה למנהל
+        await interaction.followup.send(f"✅ עודכן בהצלחה! יתרה חדשה: {new_total}", ephemeral=True)
             
         updated_count = 0
         for u_id, u_data in all_users.items():
