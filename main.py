@@ -1557,6 +1557,7 @@ async def on_interaction(interaction: discord.Interaction):
     custom_id = interaction.data.get("custom_id", "")
     user_id = str(interaction.user.id)
 
+    # 💰 1. בדיקת קרדיטים
     if custom_id == "my_credits":
         try:
             try:
@@ -1570,63 +1571,70 @@ async def on_interaction(interaction: discord.Interaction):
             await interaction.response.send_message(f"❌ שגיאה בקריאת נתונים: {e}", ephemeral=True)
         return
 
+    # 📱 2. שליחת מודאל ספאם
     elif custom_id == "spam_phone":
         await interaction.response.send_modal(SpamModal())
         return
-        # 🎁 הבלוק החדש שמטפל בפרס היומי
-        elif custom_id == "daily_claim_btn":
+
+    # 🎁 3. איסוף פרס יומי
+    elif custom_id == "daily_claim_btn":
+        try:
+            user_ref = db.reference(f"users/{user_id}")
             try:
-                user_ref = db.reference(f"users/{user_id}")
-                try:
-                    snap = user_ref.get()
-                except Exception:
-                    snap = None
-                
-                if snap and isinstance(snap, dict):
-                    cur_credits = snap.get("credits", "0")
-                    last_claim = snap.get("last_claim", 0)
-                else:
-                    cur_credits = "0"
-                    last_claim = 0
-        
-        now_timestamp = int(time.time())
-        cooldown_seconds = 24 * 3600  # 24 שעות בשניות
-        
-        if now_timestamp - last_claim < cooldown_seconds:
-            remaining_seconds = cooldown_seconds - (now_timestamp - last_claim)
-            hours, remainder = divmod(remaining_seconds, 3600)
-            minutes, _ = divmod(remainder, 60)
+                snap = user_ref.get()
+            except Exception:
+                snap = None
             
-            cooldown_embed = discord.Embed(
-                title="⏳ Already claimed today",
-                description=f"Come back in **{hours}h {minutes}m**",
+            if snap and isinstance(snap, dict):
+                cur_credits = snap.get("credits", "0")
+                last_claim = snap.get("last_claim", 0)
+            else:
+                cur_credits = "0"
+                last_claim = 0
+                
+            now_timestamp = int(time.time())
+            cooldown_seconds = 24 * 3600
+
+            if now_timestamp - last_claim < cooldown_seconds:
+                remaining = cooldown_seconds - (now_timestamp - last_claim)
+                hours, remainder = divmod(remaining, 3600)
+                minutes, _ = divmod(remainder, 60)
+                
+                cooldown_embed = discord.Embed(
+                    title="🎁 Already claimed today!",
+                    description=f"Come back in **{hours}h {minutes}m**",
+                    color=discord.Color.from_rgb(47, 49, 54)
+                )
+                await interaction.response.send_message(embed=cooldown_embed, ephemeral=True)
+                return
+
+            if cur_credits != "lifetime":
+                try:
+                    curr_int = int(cur_credits or 0)
+                except ValueError:
+                    curr_int = 0
+                
+                new_credits = str(curr_int + 5)
+                user_ref.update({
+                    "credits": new_credits,
+                    "last_claim": now_timestamp
+                })
+                balance_text = f"New balance: **{new_credits}** credits"
+            else:
+                user_ref.update({
+                    "last_claim": now_timestamp
+                })
+                balance_text = "Your balance is **Lifetime**"
+
+            success_embed = discord.Embed(
+                title="🎁 +5 Credits!",
+                description=f"{balance_text}\nCome back tomorrow!",
                 color=discord.Color.from_rgb(47, 49, 54)
             )
-            return await interaction.response.send_message(embed=cooldown_embed, ephemeral=True)
-            
-        if cur_credits != "lifetime":
-            try:
-                curr_int = int(cur_credits or 0)
-            except ValueError:
-                curr_int = 0
-            
-            new_credits = str(curr_int + 5)
-            user_ref.update({"credits": new_credits, "last_claim": now_timestamp})
-            balance_text = f"New balance: **{new_credits}** credits"
-        else:
-            user_ref.update({"last_claim": now_timestamp})
-            balance_text = "Your balance is **Lifetime**"
-            
-        success_embed = discord.Embed(
-            title="🎁 +5 Credits!",
-            description=f"{balance_text}\nCome back tomorrow!",
-            color=discord.Color.from_rgb(47, 49, 54)
-        )
-        await interaction.response.send_message(embed=success_embed, ephemeral=True)
-        
-    # ----------------------------------------------------
-    # מכאן והלאה הכל המשך הקוד המקורי שלך ללא שום שינוי:
-    # ----------------------------------------------------
+            await interaction.response.send_message(embed=success_embed, ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ שגיאה בעדכון הפרס: {e}", ephemeral=True)
+        return
     elif custom_id.startswith("claim_"):
         await interaction.response.defer(ephemeral=True)
         d_id = custom_id.split("_")[1]
