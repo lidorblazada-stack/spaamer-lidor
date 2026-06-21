@@ -54,21 +54,19 @@ tempRequests = {}
 activeDrops = {}
 
 # --- החיבור ל-Firebase ---
-    try:
-        firebase_config = json.loads(os.getenv("FIREBASE_CONFIG", "{}"))
-        if not firebase_config:
-            cred = credentials.Certificate("serviceAccountKey.json")
-        else:
-            cred = credentials.Certificate(firebase_config)
+try:
+    firebase_config = json.loads(os.getenv("FIREBASE_CONFIG", "{}"))
+    if not firebase_config:
+        cred = credentials.Certificate("serviceAccountKey.json")
+    else:
+        cred = credentials.Certificate(firebase_config)
 
-        firebase_admin.initialize_app(cred, {
-            'databaseURL': 'https://lidor-spammer-default-rtdb.firebaseio.com/'
-        })
-        print("✅ Firebase אותחל בהצלחה ומחובר ל-lidor-spammer!")
-    except Exception as e:
-        print("Firebase Error:", e)
-
-
+    firebase_admin.initialize_app(cred, {
+        'databaseURL': 'https://lidor-spammer-default-rtdb.firebaseio.com/'
+    })
+    print("✅ Firebase אותחל בהצלחה ומחובר ל-lidor-spammer!")
+except Exception as e:
+    print("Firebase Error:", e)
 # --- פונקציות עזר וניהול הרשאות ---
 def is_manager(interaction: discord.Interaction) -> bool:
     if interaction.user.id in ALLOWED_USERS:
