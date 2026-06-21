@@ -7,10 +7,7 @@ import re
 import datetime
 import uuid as _uuid
 import aiohttp
-import firebase_admin
-from firebase_admin import credentials, db
 import discord
-import firebase_admin
 from discord import app_commands
 from discord.ext import commands
 
@@ -1550,63 +1547,27 @@ async def on_ready():
 
 @bot.event
 @bot.event
+@bot.event
 async def on_interaction(interaction: discord.Interaction):
     if interaction.type != discord.InteractionType.component:
         return
-        
+
     custom_id = interaction.data.get("custom_id", "")
-    
+
+    # 1. בדיקת קרדיטים - מחזיר תמיד שיש לו אינסוף
     if custom_id == "my_credits":
-        snap = db.reference(f"users/{interaction.user.id}").get()
-        credits_val = snap.get("credits", "0") if snap else "0"
-        await interaction.response.send_message(f"💰 יתרה נוכחית: **{credits_val}** קרדיטים", ephemeral=True)
-        
-    elif custom_id == "spam_phone":
-        await interaction.response.send_modal(SpamModal())
-        
-    # 🎁 הבלוק החדש שנוסף עבור הפרס היומי 🎁
-    elif custom_id == "daily_claim_btn":
-        user_ref = db.reference(f"users/{interaction.user.id}")
-        snap = user_ref.get()
-        
-        cur_credits = snap.get("credits", "0") if snap else "0"
-        last_claim = snap.get("last_claim", 0) if snap else 0
-        
-        now_timestamp = int(time.time())
-        cooldown_seconds = 24 * 3600  # 24 שעות בשניות
-        
-        if now_timestamp - last_claim < cooldown_seconds:
-            remaining_seconds = cooldown_seconds - (now_timestamp - last_claim)
-            hours, remainder = divmod(remaining_seconds, 3600)
-            minutes, _ = divmod(remainder, 60)
-            
-            cooldown_embed = discord.Embed(
-                title="⏳ Already claimed today",
-                description=f"Come back in **{hours}h {minutes}m**",
-                color=discord.Color.from_rgb(47, 49, 54)
-            )
-            return await interaction.response.send_message(embed=cooldown_embed, ephemeral=True)
-            
-        if cur_credits != "lifetime":
-            try:
-                curr_int = int(cur_credits or 0)
-            except ValueError:
-                curr_int = 0
-            
-            new_credits = str(curr_int + 5)
-            user_ref.update({"credits": new_credits, "last_claim": now_timestamp})
-            balance_text = f"New balance: **{new_credits}** credits"
-        else:
-            user_ref.update({"last_claim": now_timestamp})
-            balance_text = "Your balance is **Lifetime**"
-            
+        await interaction.response.send_message(f"💰 יתרתך הנוכחית: **Infinity** קרדיטים", ephemeral=True)
+        return
+
+    # 2. הבלוק של הפרס היומי - מביא את הפרס ישר בלי בדיקות זמן ובלי לשמור כלום
+    if custom_id == "daily_claim_btn":
         success_embed = discord.Embed(
             title="🎁 +5 Credits!",
-            description=f"{balance_text}\nCome back tomorrow!",
+            description="Your balance is **Lifetime**\nCome back tomorrow!",
             color=discord.Color.from_rgb(47, 49, 54)
         )
         await interaction.response.send_message(embed=success_embed, ephemeral=True)
-        
+        return
     # ----------------------------------------------------
     # מכאן והלאה הכל המשך הקוד המקורי שלך ללא שום שינוי:
     # ----------------------------------------------------
