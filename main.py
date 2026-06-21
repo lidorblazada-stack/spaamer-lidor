@@ -50,22 +50,6 @@ active_spam_tasks: dict[int, asyncio.Task] = {}
 tempRequests = {}
 activeDrops = {}
 
-# --- חיבור ל-Firebase ---
-try:
-    firebase_config = json.loads(os.getenv("FIREBASE_CONFIG", "{}"))
-    # אם הקובץ לא נטען דרך משתני סביבה, הבוט ינסה להשתמש בקובץ JSON מקומי
-    if not firebase_config:
-        cred = credentials.Certificate("serviceAccountKey.json")
-    else:
-        cred = credentials.Certificate(firebase_config)
-        
-    firebase_admin.initialize_app(cred, {
-        'databaseURL': "https://nlhhhh-default-rtdb.firebaseio.com"
-    })
-    print("✅ Firebase אותחל בהצלחה ומחובר ל-Nlhhhh!")
-except Exception as e:
-    print("Firebase Error:", e)
-
 
 # --- פונקציות עזר וניהול הרשאות ---
 def is_manager(interaction: discord.Interaction) -> bool:
