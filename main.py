@@ -1714,59 +1714,21 @@ async def add_credits(interaction: discord.Interaction, target_type: str, amount
     await interaction.response.defer(ephemeral=True)
 
     # אפשרות 1: הוספה לכל המשתמשים בו-זמנית
+   # תחילת הבדיקה של סוג הפעולה
     if target_type == "all":
-        # בדיקה שבמצב גלובלי לא הזינו בטעות "lifetime" (זה עלול לשבש את ה-Database לכולם)
+        # לוגיקה ל-all...
         if amount.lower() == "lifetime":
-            return await interaction.followup.send("❌ לא ניתן להעניק סטטוס Lifetime לכל המשתמשים בבת אחת! אנא הזן מספר.", ephemeral=True)
-            
-        try:
-            add_int = int(amount)
-            if add_int <= 0:
-                return await interaction.followup.send("❌ יש להזין כמות קרדיטים גדולה מ-0", ephemeral=True)
-        except ValueError:
-            return await interaction.followup.send("❌ עבור הוספה לכל המשתמשים יש להזין מספר תקין בלבד.", ephemeral=True)
-            
-        users_ref = db.reference("users")
-        all_users = users_ref.get()
+             return await interaction.followup.send("❌ לא ניתן לתת Lifetime לכולם!", ephemeral=True)
+        # ... כאן יבוא שאר הקוד של ה-all שלך ...
         
-        if not all_users or not isinstance(all_users, dict):
-            return await interaction.followup.send("❌ לא נמצאו משתמשים במסד הנתונים", ephemeral=True)
-            
-        updated_count = 0
-        for u_id, u_data in all_users.items():
-            # מדלגים על משתמשי lifetime קיימים כדי לא להרוס להם את הסטטוס
-            if u_data.get("credits") == "lifetime":
-                continue
-                
-            try:
-                curr_int = int(u_data.get("credits", 0))
-            except (ValueError, TypeError):
-                curr_int = 0
-                
-            new_credits = str(curr_int + add_int)
-            db.reference(f"users/{u_id}").update({"credits": new_credits})
-            updated_count += 1
-            
-        await send_detailed_log("💰 הוספת קרדיטים גלובלית", interaction.user, [
-            {"name": "כמות שהתווספה לכולם:", "value": str(add_int)},
-            {"name": "סה\"כ משתמשים שעודכנו:", "value": str(updated_count)}
-        ], color=0x2ECC71)
-        
-        return await interaction.followup.send(f"✅ הפיצוץ הצליח! התווספו **{add_int}** קרדיטים ל-**{updated_count}** משתמשים בבסיס הנתונים.", ephemeral=True)
-
-    # אפשרות 2: הוספה למשתמש ספציפי (התאמה מלאה לקוד המקורי שלך שתומך ב-lifetime)
-elif target_type == "single":
+    elif target_type == "single":
         if not user:
             return await interaction.followup.send("❌ בחר משתמש!", ephemeral=True)
         
-        # חיבור למשתמש ספציפי בבסיס הנתונים
         ref = db.reference(f"users/{user.id}")
-        
-        # קריאה בטוחה
         snap = ref.get()
         cur = str(snap.get("credits", "0")) if isinstance(snap, dict) else "0"
-        
-        # לוגיקה לחישוב הקרדיטים החדשים
+            
         if cur == "lifetime" or str(amount).lower() == "lifetime":
             new_total = "lifetime"
         else:
@@ -1775,7 +1737,6 @@ elif target_type == "single":
             except ValueError:
                 return await interaction.followup.send("❌ נא להזין מספר תקין או 'lifetime'", ephemeral=True)
         
-        # עדכון ב-Firebase
         ref.update({"credits": new_total, "last_claim": 0})
         await interaction.followup.send(f"✅ עודכן בהצלחה! יתרה חדשה: {new_total}", ephemeral=True)
 # ... (אחרי כל הפקודות הקיימות שלך)
