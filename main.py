@@ -1759,13 +1759,14 @@ elif target_type == "single":
         if not user:
             return await interaction.followup.send("❌ בחר משתמש!", ephemeral=True)
         
+        # חיבור למשתמש ספציפי בבסיס הנתונים
         ref = db.reference(f"users/{user.id}")
         
-        # קריאה בטוחה מה-Database
+        # קריאה בטוחה
         snap = ref.get()
         cur = str(snap.get("credits", "0")) if isinstance(snap, dict) else "0"
-            
-        # חישוב היתרה החדשה
+        
+        # לוגיקה לחישוב הקרדיטים החדשים
         if cur == "lifetime" or str(amount).lower() == "lifetime":
             new_total = "lifetime"
         else:
@@ -1774,7 +1775,7 @@ elif target_type == "single":
             except ValueError:
                 return await interaction.followup.send("❌ נא להזין מספר תקין או 'lifetime'", ephemeral=True)
         
-        # עדכון הנתונים ב-Firebase
+        # עדכון ב-Firebase
         ref.update({"credits": new_total, "last_claim": 0})
         await interaction.followup.send(f"✅ עודכן בהצלחה! יתרה חדשה: {new_total}", ephemeral=True)
 # ... (אחרי כל הפקודות הקיימות שלך)
