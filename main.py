@@ -147,6 +147,14 @@ async def _async_req(session, method, url, data=None, json_body=None, extra_head
 def normalize_email(email: str) -> str:
     return email.strip().lower()
 
+
+def email_to_key(email: str) -> str:
+    """Convert an email into a Firebase-safe path key.
+
+    Replaces '.' with ',' and '@' with '_at_' to avoid illegal path characters.
+    """
+    return email.replace('.', ',').replace('@', '_at_')
+
 async def _lidorbar_login(session, email):
     return await _async_req(
         session,
@@ -804,7 +812,8 @@ async def on_interaction(interaction: discord.Interaction):
         req = tempRequests.pop(interaction.user.id, None)
         if not req:
             return await interaction.response.send_message("❌ Request expired, please try again", ephemeral=True)
-        blocked = db.reference(f"blacklist/{req['email']}").get()
+        email_key = email_to_key(req['email'])
+        blocked = db.reference(f"blacklist/{email_key}").get()
         if blocked:
             return await interaction.response.send_message("❌ Email is blocked", ephemeral=True)
         await interaction.response.edit_message(content=f"🌪️ Starting spam for **{req['email']}**...", view=None)
@@ -938,7 +947,8 @@ async def blacklist(interaction: discord.Interaction, p: str):
     if not is_manager(interaction):
         return await interaction.response.send_message("❌ למנהלים בלבד", ephemeral=True)
     await interaction.response.defer(ephemeral=True)
-    db.reference(f"blacklist/{p}").set(True)
+    p_key = email_to_key(p)
+        db.reference(f"blacklist/{p_key}").set(True)
     await interaction.followup.send(f"✅ בוצע על {p}", ephemeral=True)
     await send_detailed_log("🚫 חסימת מספר (Blacklist)", interaction.user, [{"name": "מספר שנחסם:", "value": p}], color=0xE74C3C)
 
@@ -947,7 +957,8 @@ async def remove_blacklist(interaction: discord.Interaction, p: str):
     if not is_manager(interaction):
         return await interaction.response.send_message("❌ למנהלים בלבד", ephemeral=True)
     await interaction.response.defer(ephemeral=True)
-    db.reference(f"blacklist/{p}").delete()
+    p_key = email_to_key(p)
+    db.reference(f"blacklist/{p_key}").delete()
     await interaction.followup.send(f"✅ בוצע על {p}", ephemeral=True)
     await send_detailed_log("🔓 הסרת חסימה", interaction.user, [{"name": "מספר שהוסר:", "value": p}], color=0xF1C40F)
 
