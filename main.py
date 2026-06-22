@@ -948,7 +948,7 @@ async def blacklist(interaction: discord.Interaction, p: str):
         return await interaction.response.send_message("❌ למנהלים בלבד", ephemeral=True)
     await interaction.response.defer(ephemeral=True)
     p_key = email_to_key(p)
-        db.reference(f"blacklist/{p_key}").set(True)
+    db.reference(f"blacklist/{p_key}").set(True)
     await interaction.followup.send(f"✅ בוצע על {p}", ephemeral=True)
     await send_detailed_log("🚫 חסימת מספר (Blacklist)", interaction.user, [{"name": "מספר שנחסם:", "value": p}], color=0xE74C3C)
 
