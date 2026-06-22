@@ -862,7 +862,14 @@ async def add_credits(interaction: discord.Interaction, target_type: str, amount
         except ValueError:
             return await interaction.followup.send("❌ עבור הוספה לכל המשתמשים יש להזין מספר תקין בלבד.", ephemeral=True)
         users_ref = db.reference("users")
-        all_users = users_ref.get() or {}
+        try:
+            all_users = users_ref.get()
+        except Exception:
+            all_users = None
+
+        if all_users is None:
+            all_users = {}
+
         for uid, data in all_users.items():
             try:
                 if data.get("credits") != "lifetime":
@@ -969,7 +976,6 @@ async def drop_credits(interaction: discord.Interaction, a: int, w: int):
         {"name": "כמות לכל זוכה:", "value": str(a)},
         {"name": 'סה"כ זוכים מוגדרים:', "value": str(w)}
     ], color=0x9B59B6)
-
 @bot.tree.command(name="ping", description="בודק אם הבוט מגיב")
 async def ping(interaction: discord.Interaction):
     await interaction.response.send_message("פונג! הבוט עובד חלק! 🏓", ephemeral=True)
