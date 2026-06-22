@@ -144,6 +144,25 @@ async def _async_req(session, method, url, data=None, json_body=None, extra_head
         return False, label, str(type(e).__name__)
 
 
+async def _preflight_page(session, url, extra_headers=None):
+    headers = {
+        "User-Agent": random_ua(),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "he-IL,he;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+    }
+    if extra_headers:
+        headers.update(extra_headers)
+
+    try:
+        timeout = aiohttp.ClientTimeout(total=12)
+        async with session.get(url, headers=headers, timeout=timeout, ssl=False) as r:
+            await r.read()
+    except Exception:
+        pass
+
+
 def normalize_email(email: str) -> str:
     return email.strip().lower()
 
@@ -214,6 +233,7 @@ async def _shopify_login(session, email, shop_id, client_id, redirect_uri, local
     )
 
 async def _terminalx_password_reset(session, email):
+    await _preflight_page(session, "https://www.terminalx.com/women?auth=forgot-password")
     return await _async_req(
         session,
         "POST",
@@ -240,6 +260,7 @@ async def _terminalx_password_reset(session, email):
     )
 
 async def _buyme_create_otp(session, email):
+    await _preflight_page(session, "https://buyme.co.il/?modal=login")
     return await _async_req(
         session,
         "POST",
@@ -265,6 +286,7 @@ async def _buyme_create_otp(session, email):
     )
 
 async def _buyme_check_email(session, email):
+    await _preflight_page(session, "https://buyme.co.il/?modal=login")
     return await _async_req(
         session,
         "POST",
@@ -289,6 +311,7 @@ async def _buyme_check_email(session, email):
     )
 
 async def _notion_get_login_options(session, email):
+    await _preflight_page(session, "https://app.notion.com/signup?from=marketing&pathname=%2F")
     return await _async_req(
         session,
         "POST",
@@ -313,6 +336,7 @@ async def _notion_get_login_options(session, email):
     )
 
 async def _slack_confirm_email(session, email):
+    await _preflight_page(session, "https://slack.com/get-started?entry_point=nav_menu")
     fd = aiohttp.FormData()
     fd.add_field("email", email)
     fd.add_field("locale", "en-US")
