@@ -967,7 +967,7 @@ async def drop_credits(interaction: discord.Interaction, a: int, w: int):
     await interaction.response.send_message(embed=embed, view=view)
     await send_detailed_log("🎁 יצירת דרופ קרדיטים", interaction.user, [
         {"name": "כמות לכל זוכה:", "value": str(a)},
-        {"name": "סה"כ זוכים מוגדרים:", "value": str(w)}
+        {"name": 'סה"כ זוכים מוגדרים:', "value": str(w)}
     ], color=0x9B59B6)
 
 @bot.tree.command(name="ping", description="בודק אם הבוט מגיב")
