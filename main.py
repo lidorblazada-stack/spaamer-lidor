@@ -69,22 +69,96 @@ except Exception as e:
 
 class _DummyRef:
     def __init__(self, path=""):
-        self._path = path
+        self._path = path.strip("/")
+        self._file = os.getenv("FIREBASE_FALLBACK_FILE", "firebase_fallback.json")
+
+    def _load(self):
+        try:
+            if not os.path.exists(self._file):
+                return {}
+            with open(self._file, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
+    def _save(self, data):
+        try:
+            with open(self._file, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+
+    def _get_by_path(self, data, path_parts):
+        cur = data
+        for p in path_parts:
+            if isinstance(cur, dict) and p in cur:
+                cur = cur[p]
+            else:
+                return None
+        return cur
+
+    def _set_by_path(self, data, path_parts, value):
+        cur = data
+        for p in path_parts[:-1]:
+            if p not in cur or not isinstance(cur[p], dict):
+                cur[p] = {}
+            cur = cur[p]
+        cur[path_parts[-1]] = value
 
     def get(self):
-        return None
+        data = self._load()
+        if not self._path:
+            return data
+        parts = self._path.split("/")
+        return self._get_by_path(data, parts)
 
-    def update(self, _):
-        return None
+    def set(self, value):
+        data = self._load()
+        if not self._path:
+            if isinstance(value, dict):
+                data = value
+            else:
+                return
+        else:
+            parts = self._path.split("/")
+            self._set_by_path(data, parts, value)
+        self._save(data)
 
-    def set(self, _):
-        return None
+    def update(self, val: dict):
+        if not isinstance(val, dict):
+            return
+        data = self._load()
+        if not self._path:
+            # merge at root
+            for k, v in val.items():
+                data[k] = v
+        else:
+            parts = self._path.split("/")
+            cur = self._get_by_path(data, parts) or {}
+            if not isinstance(cur, dict):
+                cur = {}
+            for k, v in val.items():
+                cur[k] = v
+            self._set_by_path(data, parts, cur)
+        self._save(data)
 
     def delete(self):
-        return None
+        data = self._load()
+        if not self._path:
+            data.clear()
+        else:
+            parts = self._path.split("/")
+            cur = data
+            for p in parts[:-1]:
+                if p not in cur or not isinstance(cur[p], dict):
+                    return
+                cur = cur[p]
+            cur.pop(parts[-1], None)
+        self._save(data)
 
-    def child(self, _):
-        return _DummyRef()
+    def child(self, name):
+        new_path = f"{self._path}/{name}" if self._path else str(name)
+        return _DummyRef(new_path)
 
 
 def safe_db_ref(path: str):
