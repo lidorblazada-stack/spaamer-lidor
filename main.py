@@ -46,6 +46,7 @@ ALLOWED_USERS = [
 active_spam_tasks: dict[int, asyncio.Task] = {}
 tempRequests = {}
 activeDrops = {}
+firebase_ready = False
 
 try:
     firebase_config = os.getenv("FIREBASE_CONFIG") or os.getenv("FIREBASE_SERVICE_ACCOUNT")
@@ -62,6 +63,7 @@ try:
     firebase_admin.initialize_app(cred, {
         'databaseURL': firebase_database_url
     })
+    firebase_ready = True
     print("✅ Firebase initialized for email bot!")
 except Exception as e:
     print("Firebase Error:", e)
@@ -85,8 +87,11 @@ class _DummyRef:
         try:
             with open(self._file, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Firebase fallback save error: {e}")
+
+    def _log_fallback(self, action: str, value=None):
+        print(f"[Firebase Fallback] {action}: {self._path} -> {value}")
 
     def _get_by_path(self, data, path_parts):
         cur = data
@@ -123,6 +128,7 @@ class _DummyRef:
             parts = self._path.split("/")
             self._set_by_path(data, parts, value)
         self._save(data)
+        self._log_fallback("set", value)
 
     def update(self, val: dict):
         if not isinstance(val, dict):
@@ -140,6 +146,7 @@ class _DummyRef:
                 cur[k] = v
             self._set_by_path(data, parts, cur)
         self._save(data)
+        self._log_fallback("update", val)
 
     def delete(self):
         data = self._load()
@@ -161,13 +168,12 @@ class _DummyRef:
 
 
 def safe_db_ref(path: str):
-    _real_db_reference = getattr(db, "reference", None)
-    try:
-        if _real_db_reference:
-            return _real_db_reference(path)
-        return db.reference(path)
-    except Exception:
-        return _DummyRef(path)
+    if firebase_ready:
+        try:
+            return db.reference(path)
+        except Exception as e:
+            print(f"Firebase reference error for {path}: {e}")
+    return _DummyRef(path)
 
 
 def is_manager(interaction: discord.Interaction) -> bool:
